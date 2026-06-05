@@ -1677,7 +1677,7 @@ function resetApp() {
   toast('ok', 'Form direset ke kondisi awal.');
 }
 
-
+function toast(type, msg) {
   const box = document.getElementById('toast-box');
   const el  = document.createElement('div');
   el.className = `toast ${type}`;
