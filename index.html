@@ -550,17 +550,6 @@
       background:#1a4a3a; border-color:var(--accent); color:var(--accent);
     }
     #grant-btn { display:none; }
-    #reset-btn {
-      background:none; border:1px solid var(--border);
-      color:var(--text-dim); font-size:13px; font-weight:500;
-      padding:8px 13px; border-radius:var(--r);
-      cursor:pointer; font-family:var(--font);
-      transition:all .15s; white-space:nowrap;
-    }
-    #reset-btn:hover {
-      border-color:var(--danger); color:var(--danger);
-      background:var(--danger-dim);
-    }
 
     /* ── MODAL ───────────────────────────────────────────────── */
     .modal-bg {
@@ -847,7 +836,6 @@
   </div>
   <div class="act-row">
     <span class="mode-badge" id="mode-badge"></span>
-    <button id="reset-btn" title="Reset form ke kondisi awal" onclick="resetApp()">↺ Reset</button>
     <button class="btn btn-ghost" id="set-folder-btn" onclick="pickRootFolder()">📂 Set Root Folder</button>
     <button class="btn btn-ghost" id="grant-btn" onclick="grantAccess()">🔓 Izinkan Akses</button>
     <button class="btn btn-prim"  id="copy-btn" disabled onclick="doAction()">Print ▶</button>
@@ -1605,79 +1593,7 @@ document.getElementById('inp-chprefix').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('btn-chprefix-save').click();
 });
 
-function resetApp() {
-  // Reset state (preserve prefix, rootHandle, fsaMode)
-  S.file       = null;
-  S.totalPages = 0;
-  S.mat        = null;
-  S.lainText   = '';
-  S.qty        = '1';
-  S.customer   = '';
-  S.isTB       = false;
-  S.allPages   = false;
-  S.lamit      = null;
-  S.cutting    = false;
-  S.potong     = false;
-  S.fnLocked   = false;
-
-  // Reset drop zone
-  const dz = document.getElementById('dropzone');
-  dz.classList.remove('loaded');
-  dz.querySelector('.dz-icon').textContent  = '📄';
-  dz.querySelector('.dz-title').textContent = 'Drop PDF di sini';
-  dz.querySelector('.dz-sub').textContent   = 'atau klik untuk browse';
-  document.getElementById('drop-input').value = '';
-
-  // Hide preview and PDF info
-  document.getElementById('preview-wrap').classList.remove('show');
-  document.getElementById('pdf-info').classList.add('show'); // keep same hidden state
-  document.getElementById('pdf-info').classList.remove('show');
-  document.getElementById('preview-pages').innerHTML = '';
-
-  // Reset material buttons
-  document.querySelectorAll('.mb').forEach(b => b.classList.remove('active'));
-  const lainInp = document.getElementById('lain-input');
-  if (lainInp) { lainInp.classList.remove('show'); lainInp.value = ''; }
-
-  // Reset qty, customer
-  document.getElementById('qty-input').value = '1';
-  document.getElementById('cust-input').value = '';
-  document.getElementById('unit-lbl').textContent = 'Lbr';
-
-  // Reset sisi toggles
-  document.getElementById('tb-1sisi').classList.add('active');
-  document.getElementById('tb-2sisi').classList.remove('active');
-  document.getElementById('tb-2sisi').disabled = false;
-
-  // Reset hal toggles
-  document.getElementById('tb-1hal').classList.add('active');
-  document.getElementById('tb-allhal').classList.remove('active');
-  document.getElementById('tb-1hal').disabled   = false;
-  document.getElementById('tb-allhal').disabled = false;
-  document.getElementById('tb-allhal').textContent = 'All';
-
-  // Reset lamit buttons
-  document.querySelectorAll('.lb').forEach(b => b.classList.remove('active'));
-
-  // Reset checkboxes
-  document.getElementById('ck-cutting').classList.remove('active');
-  document.getElementById('ck-potong').classList.remove('active');
-
-  // Reset filename input
-  const fi = document.getElementById('fname-input');
-  fi.value = '';
-  fi.placeholder = 'Pilih material dan isi form…';
-  fi.classList.add('empty');
-  fi.setAttribute('readonly', '');
-
-  // Reset dest path
-  document.getElementById('dest-sub').textContent = '—';
-
-  refreshBar();
-  toast('ok', 'Form direset ke kondisi awal.');
-}
-
-
+function toast(type, msg) {
   const box = document.getElementById('toast-box');
   const el  = document.createElement('div');
   el.className = `toast ${type}`;
