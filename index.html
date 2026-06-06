@@ -1537,6 +1537,7 @@ async function copyToFolder(filename) {
     setTimeout(() => {
       btn.textContent = 'Print ▶';
       btn.classList.remove('done');
+      resetApp(true);
     }, 2200);
 
   } catch(e) {
@@ -1566,6 +1567,7 @@ function downloadFile(filename) {
   refreshBar();
 
   toast('ok', `⬇️ Pindahkan ke C:\\#Cetak\\${folder}\\`);
+  resetApp(true);
 }
 
 function showSetup() {
@@ -1605,14 +1607,14 @@ document.getElementById('inp-chprefix').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('btn-chprefix-save').click();
 });
 
-function resetApp() {
-  // Reset state (preserve prefix, rootHandle, fsaMode)
+function resetApp(preserveCustomer = false) {
+  // Reset state (preserve prefix, rootHandle, fsaMode always)
   S.file       = null;
   S.totalPages = 0;
   S.mat        = null;
   S.lainText   = '';
   S.qty        = '1';
-  S.customer   = '';
+  if (!preserveCustomer) S.customer = '';
   S.isTB       = false;
   S.allPages   = false;
   S.lamit      = null;
@@ -1639,9 +1641,9 @@ function resetApp() {
   const lainInp = document.getElementById('lain-input');
   if (lainInp) { lainInp.classList.remove('show'); lainInp.value = ''; }
 
-  // Reset qty, customer
+  // Reset qty and customer
   document.getElementById('qty-input').value = '1';
-  document.getElementById('cust-input').value = '';
+  if (!preserveCustomer) document.getElementById('cust-input').value = '';
   document.getElementById('unit-lbl').textContent = 'Lbr';
 
   // Reset sisi toggles
@@ -1674,7 +1676,7 @@ function resetApp() {
   document.getElementById('dest-sub').textContent = '—';
 
   refreshBar();
-  toast('ok', 'Form direset ke kondisi awal.');
+  toast('ok', 'Form direset.');
 }
 
 function toast(type, msg) {
