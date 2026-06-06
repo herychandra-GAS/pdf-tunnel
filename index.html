@@ -1371,7 +1371,12 @@ async function loadPDF(file) {
     const cs = detectCS(buf);
     const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
     S.totalPages = pdf.numPages;
-    applyButtonStates(); 
+    applyButtonStates();
+
+    // Update "All" button label and filename immediately — don't wait for render
+    document.getElementById('tb-allhal').textContent =
+      S.totalPages > 1 ? `All (${S.totalPages})` : '1 hal';
+    refreshBar();
 
     const pg1 = await pdf.getPage(1);
     const vp1 = pg1.getViewport({ scale:1 });
@@ -1422,9 +1427,6 @@ async function loadPDF(file) {
     const csEl = document.getElementById('ii-color');
     csEl.textContent = cs;
     csEl.className   = 'iv ' + cs.toLowerCase().replace(/\s/g,'');
-
-    document.getElementById('tb-allhal').textContent =
-      S.totalPages > 1 ? `All (${S.totalPages})` : '1 hal';
 
   } catch(e) {
     loader.style.display = 'flex';
