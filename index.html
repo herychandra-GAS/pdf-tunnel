@@ -1608,7 +1608,7 @@ document.getElementById('inp-chprefix').addEventListener('keydown', e => {
 });
 
 function resetApp(preserveCustomer = false) {
-  // Reset state (preserve prefix, rootHandle, fsaMode always)
+  // Reset state (preserve prefix via localStorage, rootHandle, fsaMode always)
   S.file       = null;
   S.totalPages = 0;
   S.mat        = null;
