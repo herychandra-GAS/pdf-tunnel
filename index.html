@@ -2196,7 +2196,9 @@ dz.addEventListener('dragleave', ()  => dz.classList.remove('over'));
 dz.addEventListener('drop', e => {
   e.preventDefault();
   dz.classList.remove('over');
-  const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
+  const files = Array.from(e.dataTransfer.files).filter(f =>
+    f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
+  );
   if (!files.length) { toast('err','Tidak ada file PDF yang valid.'); return; }
   if (files.length === 1) {
     exitBatchMode();
@@ -2207,7 +2209,9 @@ dz.addEventListener('drop', e => {
 });
 dz.addEventListener('click', () => di.click());
 di.addEventListener('change', () => {
-  const files = Array.from(di.files).filter(f => f.type === 'application/pdf');
+  const files = Array.from(di.files).filter(f =>
+    f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
+  );
   di.value = '';
   if (!files.length) return;
   if (files.length === 1) {
