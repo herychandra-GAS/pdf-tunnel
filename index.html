@@ -159,7 +159,7 @@
 
     /* ── LEFT PANEL ──────────────────────────────────────────── */
     #left {
-      width:268px; min-width:268px;
+      width:20%; min-width:300px;
       border-right:1px solid var(--border);
       display:flex; flex-direction:column;
       overflow-y:auto; overflow-x:hidden;
@@ -670,7 +670,7 @@
     .bq-info { flex:1; min-width:0; }
     .bq-name {
       font-size:12px; color:var(--text);
-      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      white-space:normal; overflow:visible; word-break:break-all; line-height:1.4;
     }
     .bq-meta { font-size:11px; color:var(--text-dim); font-family:var(--mono); margin-top:2px; }
     .bq-status {
@@ -698,17 +698,17 @@
       gap:2px; flex-shrink:0;
     }
     .bq-qty-lbl {
-      font-size:9px; font-weight:600; text-transform:uppercase;
+      font-size:10px; font-weight:600; text-transform:uppercase;
       letter-spacing:.06em; color:var(--text-dim);
     }
     .bq-qty-input {
-      width:36px;
+      width:48px;
       background:var(--surface-2);
       border:1px solid var(--border);
       border-radius:3px;
       color:var(--text);
-      font-family:var(--mono); font-size:13px; font-weight:600;
-      padding:3px 4px; text-align:center;
+      font-family:var(--mono); font-size:16px; font-weight:600;
+      padding:5px 4px; text-align:center;
       transition:border-color .12s;
     }
     .bq-qty-input:focus { outline:none; border-color:var(--accent); }
@@ -1885,7 +1885,7 @@ function renderBatchList() {
           onclick="event.stopPropagation()">
       </div>
       <div class="bq-info">
-        <div class="bq-name" title="${item.file.name}">${item.file.name.length > 34 ? item.file.name.slice(0,31)+'…' : item.file.name}</div>
+        <div class="bq-name" title="${item.file.name}">${item.file.name}</div>
         <div class="bq-meta" id="bq-meta-${idx}">${fmtBytes(item.file.size)}${item.errMsg ? ' · ' + item.errMsg : ''}</div>
       </div>
       <span class="bq-status ${item.status}" id="bq-st-${idx}">${statusLbl}</span>
