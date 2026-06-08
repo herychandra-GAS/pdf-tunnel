@@ -621,6 +621,118 @@
       padding:7px 16px; font-size:12px; color:var(--warn);
       text-align:center; flex-shrink:0;
     }
+
+    /* ── BATCH QUEUE ─────────────────────────────────────────── */
+    #batch-panel {
+      display:none;
+      margin:0 10px 8px;
+      flex-direction:column;
+      gap:0;
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:var(--r);
+      overflow:hidden;
+      flex-shrink:0;
+      max-height:340px;
+    }
+    #batch-panel.show { display:flex; }
+    .batch-hd {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:7px 10px;
+      background:var(--surface-2);
+      border-bottom:1px solid var(--border);
+      flex-shrink:0;
+    }
+    .batch-hd-lbl {
+      font-size:11px; font-weight:600;
+      text-transform:uppercase; letter-spacing:.08em;
+      color:var(--text-muted);
+    }
+    .batch-hd-count {
+      font-family:var(--mono); font-size:11px;
+      color:var(--accent); font-weight:600;
+    }
+    #batch-list { overflow-y:auto; flex:1; }
+    .bq-item {
+      display:flex; align-items:center; gap:8px;
+      padding:7px 10px;
+      border-bottom:1px solid var(--border);
+      transition:background .12s;
+    }
+    .bq-item:last-child { border-bottom:none; }
+    .bq-item:hover { background:var(--surface-2); }
+    .bq-num {
+      font-family:var(--mono); font-size:10px;
+      color:var(--text-dim); min-width:18px;
+      text-align:right; flex-shrink:0;
+    }
+    .bq-icon { font-size:14px; flex-shrink:0; line-height:1; }
+    .bq-info { flex:1; min-width:0; }
+    .bq-name {
+      font-size:12px; color:var(--text);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .bq-meta { font-size:11px; color:var(--text-dim); font-family:var(--mono); margin-top:1px; }
+    .bq-status {
+      font-size:10px; font-weight:600; letter-spacing:.04em;
+      padding:2px 6px; border-radius:3px;
+      text-transform:uppercase; flex-shrink:0;
+    }
+    .bq-status.pending { background:var(--surface-3); color:var(--text-dim); }
+    .bq-status.active  { background:var(--accent-dim); color:var(--accent); animation:blink 1s infinite; }
+    .bq-status.done    { background:rgba(41,217,163,.18); color:var(--accent); }
+    .bq-status.err     { background:var(--danger-dim); color:var(--danger); }
+    .bq-remove {
+      background:none; border:none; color:var(--text-dim);
+      cursor:pointer; font-size:14px; padding:2px 3px;
+      border-radius:3px; line-height:1; flex-shrink:0;
+      transition:color .12s;
+    }
+    .bq-remove:hover { color:var(--danger); }
+    .bq-item.done .bq-remove,
+    .bq-item.active .bq-remove { opacity:.3; pointer-events:none; }
+
+    /* thumbnail inside batch row */
+    .bq-thumb-wrap {
+      width:36px; height:46px; flex-shrink:0;
+      background:var(--surface-3);
+      border:1px solid var(--border);
+      border-radius:2px;
+      overflow:hidden; position:relative;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .bq-thumb-canvas { width:100%; height:100%; display:block; object-fit:cover; }
+    .bq-thumb-loading {
+      font-size:10px; color:var(--text-dim);
+      width:100%; height:100%;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .bq-thumb-pgbadge {
+      position:absolute; bottom:0; right:0;
+      background:rgba(0,0,0,.65);
+      color:#fff; font-size:8px;
+      font-family:var(--mono); font-weight:600;
+      padding:1px 3px; border-radius:2px 0 0 0;
+      line-height:1.4;
+    }
+
+    #batch-progress-wrap {
+      display:none; align-items:center; gap:8px;
+      margin-right:auto;
+    }
+    #batch-progress-wrap.show { display:flex; }
+    #batch-progress-bar {
+      width:120px; height:5px;
+      background:var(--surface-3); border-radius:3px; overflow:hidden;
+    }
+    #batch-progress-fill {
+      height:100%; background:var(--accent);
+      border-radius:3px; transition:width .3s; width:0%;
+    }
+    #batch-progress-lbl {
+      font-size:11px; color:var(--text-muted);
+      font-family:var(--mono); white-space:nowrap;
+    }
   </style>
 </head>
 <body>
@@ -725,10 +837,10 @@
   <div id="left">
     <!-- Drop zone -->
     <div id="dropzone" title="Klik atau drop file PDF di sini">
-      <input type="file" id="drop-input" accept=".pdf">
+      <input type="file" id="drop-input" accept=".pdf" multiple>
       <div class="dz-icon">📄</div>
       <div class="dz-title">Drop PDF di sini</div>
-      <div class="dz-sub">atau klik untuk browse</div>
+      <div class="dz-sub">atau klik untuk browse · multi-file OK</div>
     </div>
 
     <!-- Preview -->
@@ -738,6 +850,15 @@
         <span id="loader-txt">Memuat preview…</span>
       </div>
       <div id="preview-pages"></div>
+    </div>
+
+    <!-- Batch Queue -->
+    <div id="batch-panel">
+      <div class="batch-hd">
+        <span class="batch-hd-lbl">Antrian Batch</span>
+        <span class="batch-hd-count" id="batch-count-lbl">0 file</span>
+      </div>
+      <div id="batch-list"></div>
     </div>
 
     <!-- PDF Info -->
@@ -847,6 +968,10 @@
   </div>
   <div class="act-row">
     <span class="mode-badge" id="mode-badge"></span>
+    <div id="batch-progress-wrap">
+      <div id="batch-progress-bar"><div id="batch-progress-fill"></div></div>
+      <span id="batch-progress-lbl">0 / 0</span>
+    </div>
     <button id="reset-btn" title="Reset form ke kondisi awal" onclick="resetApp()">↺ Reset</button>
     <button class="btn btn-ghost" id="set-folder-btn" onclick="pickRootFolder()">📂 Set Root Folder</button>
     <button class="btn btn-ghost" id="grant-btn" onclick="grantAccess()">🔓 Izinkan Akses</button>
@@ -1014,6 +1139,11 @@ const S = {
   fsaMode:    ('showDirectoryPicker' in window), 
   fnLocked:   false,  
 
+  // batch
+  batchQueue: [],   // [{file, pages, status:'pending'|'active'|'done'|'err', jobNum, errMsg}]
+  batchMode:  false,
+  batchRunning: false,
+
   get prefix()  { return localStorage.getItem('pm_prefix')  || ''; },
   set prefix(v) { localStorage.setItem('pm_prefix',  v); },
 };
@@ -1124,6 +1254,19 @@ function regenFilename() {
 
 // ── VALIDATION ───────────────────────────────────────────────────
 function validate() {
+  if (S.batchMode) {
+    if (!S.batchQueue.length)  return 'Antrian batch kosong.';
+    if (!S.mat)                return 'Pilih jenis material terlebih dahulu.';
+    const qty = parseInt(S.qty);
+    if (!S.qty || isNaN(qty) || qty < 1) return 'Masukkan jumlah yang valid (min. 1).';
+    if (S.isTB && !S.mat.tb)  return `${S.mat.l} tidak bisa 2 Sisi / TB.`;
+    const stillLoading = S.batchQueue.some(x => x.pages === 0 && x.status === 'pending' && !x.errMsg);
+    if (stillLoading) return 'Halaman masih dimuat, tunggu sebentar…';
+    if (!S.fsaMode) return null;
+    if (!S.rootHandle)         return 'Set root folder (C:\\#Cetak\\) terlebih dahulu.';
+    return null;
+  }
+
   if (!S.file)       return 'Belum ada PDF yang di-drop.';
   if (!S.mat)        return 'Pilih jenis material terlebih dahulu.';
 
@@ -1148,7 +1291,16 @@ function refreshBar() {
   document.getElementById('dest-sub').textContent = folder;
 
   const fi = document.getElementById('fname-input');
-  if (!S.fnLocked) {
+  if (S.batchMode) {
+    const n = S.batchQueue.length;
+    const pending = S.batchQueue.filter(x => x.status === 'pending').length;
+    fi.value = '';
+    fi.placeholder = S.mat
+      ? `Batch: ${n} file — nama di-generate otomatis per file`
+      : 'Pilih material untuk batch…';
+    fi.classList.add('empty');
+    fi.setAttribute('readonly','');
+  } else if (!S.fnLocked) {
     const fn = buildFilename();
     if (fn) {
       fi.value = fn;
@@ -1166,6 +1318,16 @@ function refreshBar() {
   const btn = document.getElementById('copy-btn');
   btn.disabled = !!err;
   btn.title    = err || '';
+
+  // Update button label for batch
+  if (S.batchMode && !err) {
+    const pending = S.batchQueue.filter(x => x.status !== 'done').length;
+    btn.textContent = S.fsaMode
+      ? `Print Semua (${pending}) ▶`
+      : `Download Semua (${pending}) ▶`;
+  } else if (!S.batchMode) {
+    btn.textContent = S.fsaMode ? 'Print ▶' : 'Print ▶';
+  }
 }
 
 function refreshHeader() {
@@ -1371,12 +1533,7 @@ async function loadPDF(file) {
     const cs = detectCS(buf);
     const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
     S.totalPages = pdf.numPages;
-    applyButtonStates();
-
-    // Update "All" button label and filename immediately — don't wait for render
-    document.getElementById('tb-allhal').textContent =
-      S.totalPages > 1 ? `All (${S.totalPages})` : '1 hal';
-    refreshBar();
+    applyButtonStates(); 
 
     const pg1 = await pdf.getPage(1);
     const vp1 = pg1.getViewport({ scale:1 });
@@ -1427,6 +1584,9 @@ async function loadPDF(file) {
     const csEl = document.getElementById('ii-color');
     csEl.textContent = cs;
     csEl.className   = 'iv ' + cs.toLowerCase().replace(/\s/g,'');
+
+    document.getElementById('tb-allhal').textContent =
+      S.totalPages > 1 ? `All (${S.totalPages})` : '1 hal';
 
   } catch(e) {
     loader.style.display = 'flex';
@@ -1493,6 +1653,12 @@ async function grantAccess() {
 }
 
 async function doAction() {
+  // Batch mode: run all queued files
+  if (S.batchMode) {
+    await doBatchAction();
+    return;
+  }
+
   const err = validate();
   if (err) { toast('err', err); return; }
 
@@ -1539,7 +1705,6 @@ async function copyToFolder(filename) {
     setTimeout(() => {
       btn.textContent = 'Print ▶';
       btn.classList.remove('done');
-      resetApp(true);
     }, 2200);
 
   } catch(e) {
@@ -1569,7 +1734,6 @@ function downloadFile(filename) {
   refreshBar();
 
   toast('ok', `⬇️ Pindahkan ke C:\\#Cetak\\${folder}\\`);
-  resetApp(true);
 }
 
 function showSetup() {
@@ -1609,14 +1773,344 @@ document.getElementById('inp-chprefix').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('btn-chprefix-save').click();
 });
 
-function resetApp(preserveCustomer = false) {
-  // Reset state (preserve prefix via localStorage, rootHandle, fsaMode always)
+// ── BATCH MODE ───────────────────────────────────────────────────
+function enterBatchMode(files) {
+  S.batchMode  = true;
+  S.batchQueue = files.map(f => ({ file: f, pages: 0, status: 'pending', jobNum: '', errMsg: '' }));
+  S.file       = files[0]; // use first file for state context (pages loaded async)
+  S.totalPages = 0;
+  S.fnLocked   = false;
+
+  // Update dropzone UI
+  const dz = document.getElementById('dropzone');
+  dz.classList.add('loaded');
+  dz.querySelector('.dz-icon').textContent  = '📦';
+  dz.querySelector('.dz-title').textContent = `${files.length} file siap diproses`;
+  dz.querySelector('.dz-sub').textContent   = 'Drop file baru untuk menambah/mengganti';
+
+  // Hide single-file preview, show batch panel
+  document.getElementById('preview-wrap').classList.remove('show');
+  document.getElementById('pdf-info').classList.remove('show');
+  document.getElementById('batch-panel').classList.add('show');
+
+  renderBatchList();
+  loadBatchPageCounts(); // async: fills page counts in background
+  refreshBar();
+}
+
+function exitBatchMode() {
+  S.batchMode    = false;
+  S.batchQueue   = [];
+  S.batchRunning = false;
+  document.getElementById('batch-panel').classList.remove('show');
+  document.getElementById('batch-list').innerHTML = '';
+  document.getElementById('batch-progress-wrap').classList.remove('show');
+  document.getElementById('batch-progress-fill').style.width = '0%';
+}
+
+function renderBatchList() {
+  const list = document.getElementById('batch-list');
+  list.innerHTML = '';
+  const q = S.batchQueue;
+  document.getElementById('batch-count-lbl').textContent =
+    q.length + ' file';
+
+  q.forEach((item, idx) => {
+    const el = document.createElement('div');
+    el.className = 'bq-item ' + item.status;
+    el.id = 'bq-' + idx;
+
+    const icon = item.status === 'done' ? '✅'
+                : item.status === 'err'  ? '❌'
+                : item.status === 'active' ? '⏳'
+                : '📄';
+
+    const metaTxt = item.pages
+      ? `${item.pages} hal · ${fmtBytes(item.file.size)}`
+      : fmtBytes(item.file.size);
+
+    const statusLbl = item.status === 'done'    ? `✓ ${item.jobNum}`
+                    : item.status === 'err'      ? 'Error'
+                    : item.status === 'active'   ? 'Proses…'
+                    : 'Antri';
+
+    // thumbnail slot — canvas will be injected by loadBatchPageCounts
+    const thumbInner = item.thumbDataUrl
+      ? `<img class="bq-thumb-canvas" src="${item.thumbDataUrl}" alt="">
+         <span class="bq-thumb-pgbadge">${item.pages}p</span>`
+      : `<div class="bq-thumb-loading">
+           <div class="loader-spin" style="width:10px;height:10px;border-width:1.5px"></div>
+         </div>`;
+
+    el.innerHTML = `
+      <span class="bq-num">${idx + 1}</span>
+      <div class="bq-thumb-wrap" id="bq-thumb-${idx}">${thumbInner}</div>
+      <div class="bq-info">
+        <div class="bq-name" title="${item.file.name}">${item.file.name.length > 34 ? item.file.name.slice(0,31)+'…' : item.file.name}</div>
+        <div class="bq-meta" id="bq-meta-${idx}">${metaTxt}${item.errMsg ? ' · ' + item.errMsg : ''}</div>
+      </div>
+      <span class="bq-status ${item.status}" id="bq-st-${idx}">${statusLbl}</span>
+      <button class="bq-remove" title="Hapus dari antrian" onclick="removeBatchItem(${idx})">×</button>
+    `;
+    list.appendChild(el);
+  });
+}
+
+function removeBatchItem(idx) {
+  if (S.batchRunning) return;
+  S.batchQueue.splice(idx, 1);
+  if (S.batchQueue.length === 0) {
+    resetApp();
+    return;
+  }
+  if (S.batchQueue.length === 1) {
+    // drop back to single mode
+    const f = S.batchQueue[0].file;
+    exitBatchMode();
+    loadPDF(f);
+    return;
+  }
+  S.file = S.batchQueue[0].file;
+  S.totalPages = S.batchQueue[0].pages || 0;
+  renderBatchList();
+  refreshBar();
+}
+
+async function loadBatchPageCounts() {
+  // Load page counts + first-page thumbnails for all queued files
+  for (let i = 0; i < S.batchQueue.length; i++) {
+    if (!S.batchMode) return;
+    const item = S.batchQueue[i];
+    try {
+      const buf = await item.file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+      item.pages = pdf.numPages;
+
+      // Render first page to offscreen canvas → store as dataURL on item
+      const pg  = await pdf.getPage(1);
+      const vp  = pg.getViewport({ scale: 1 });
+      // Scale to fit 36px wide (the thumb width)
+      const sc  = 36 / vp.width;
+      const svp = pg.getViewport({ scale: sc });
+      const cv  = document.createElement('canvas');
+      cv.width  = Math.round(svp.width);
+      cv.height = Math.round(svp.height);
+      await pg.render({ canvasContext: cv.getContext('2d'), viewport: svp }).promise;
+      item.thumbDataUrl = cv.toDataURL('image/jpeg', 0.82);
+
+      // Update first file's totalPages for form state
+      if (i === 0) {
+        S.totalPages = pdf.numPages;
+        applyButtonStates();
+        refreshBar();
+      }
+
+      // Patch DOM in-place — no full re-render
+      const thumbWrap = document.getElementById(`bq-thumb-${i}`);
+      if (thumbWrap) {
+        thumbWrap.innerHTML =
+          `<img class="bq-thumb-canvas" src="${item.thumbDataUrl}" alt="">
+           <span class="bq-thumb-pgbadge">${item.pages}p</span>`;
+      }
+      const metaEl = document.getElementById(`bq-meta-${i}`);
+      if (metaEl) metaEl.textContent = `${item.pages} hal · ${fmtBytes(item.file.size)}`;
+
+      // Refresh bar once all done (for the loading guard)
+      refreshBar();
+
+    } catch(e) {
+      item.errMsg = 'Gagal baca PDF';
+      const thumbWrap = document.getElementById(`bq-thumb-${i}`);
+      if (thumbWrap) thumbWrap.innerHTML = `<div class="bq-thumb-loading">❌</div>`;
+      const metaEl = document.getElementById(`bq-meta-${i}`);
+      if (metaEl) metaEl.textContent = `${fmtBytes(item.file.size)} · Gagal baca`;
+      refreshBar();
+    }
+  }
+}
+
+// Build filename for a specific batch item (uses its own page count)
+function buildFilenameForItem(item) {
+  if (!S.mat) return '';
+
+  const id   = nextLDFNum();
+  const qty  = S.qty || '1';
+  const tb2  = S.isTB ? 'TB' : '';
+  const lmtS = S.lamit ? LAMIT[S.lamit].code : '';
+  const cutS = S.cutting ? '+Cutting' : '';
+  const ptgS = S.potong  ? '+Ptg'     : '';
+
+  let matV = S.mat.v;
+  if (S.mat.lain && S.lainText.trim()) matV = 'Lain ' + S.lainText.trim();
+
+  const pages = item.pages || 1;
+  let p3;
+  if (S.isTB)           p3 = Math.ceil(pages / 2);
+  else if (!S.allPages) p3 = 1;
+  else                  p3 = pages;
+
+  let orig = item.file.name;
+  if (orig.toLowerCase().endsWith('.pdf')) orig = orig.slice(0,-4);
+
+  const cust = S.customer.trim();
+  const parts = [
+    `${id}~`,
+    `${qty} x ${matV}`,
+    tb2,
+    `(${p3} hal)`,
+    `${lmtS}${cutS}${ptgS}`.trim() || null,
+    cust || null,
+    `-${orig}`,
+  ];
+  return parts.filter(Boolean).join(' ').replace(/\s{2,}/g,' ').trim() + '.pdf';
+}
+
+// Patch a single batch row's status badge + item class without full re-render
+function updateBatchItemDOM(idx) {
+  const item = S.batchQueue[idx];
+  if (!item) return;
+  const el = document.getElementById('bq-' + idx);
+  if (!el) return;
+
+  el.className = 'bq-item ' + item.status;
+
+  const stEl = document.getElementById('bq-st-' + idx);
+  if (stEl) {
+    const statusLbl = item.status === 'done'   ? `✓ ${item.jobNum}`
+                    : item.status === 'err'     ? 'Error'
+                    : item.status === 'active'  ? 'Proses…'
+                    : 'Antri';
+    stEl.className   = 'bq-status ' + item.status;
+    stEl.textContent = statusLbl;
+  }
+
+  const metaEl = document.getElementById('bq-meta-' + idx);
+  if (metaEl && item.errMsg && item.status === 'err') {
+    metaEl.textContent = `${item.pages ? item.pages + ' hal · ' : ''}${fmtBytes(item.file.size)} · ${item.errMsg}`;
+  }
+}
+
+async function doBatchAction() {
+  if (S.batchRunning) return;
+  const err = validate();
+  if (err) { toast('err', err); return; }
+
+  const isTBeff = S.isTB && S.mat.tb;
+  const folder  = folderFor(S.mat.g, isTBeff);
+
+  S.batchRunning = true;
+  const btn = document.getElementById('copy-btn');
+  btn.disabled = true;
+  document.getElementById('reset-btn').disabled = true;
+
+  const progWrap = document.getElementById('batch-progress-wrap');
+  const progFill = document.getElementById('batch-progress-fill');
+  const progLbl  = document.getElementById('batch-progress-lbl');
+  progWrap.classList.add('show');
+
+  const total  = S.batchQueue.length;
+  let   doneN  = 0;
+  let   errN   = 0;
+
+  for (let i = 0; i < S.batchQueue.length; i++) {
+    const item = S.batchQueue[i];
+    if (item.status === 'done') { doneN++; continue; }
+
+    item.status = 'active';
+    updateBatchItemDOM(i);
+
+    // Scroll to current item
+    const el = document.getElementById('bq-' + i);
+    if (el) el.scrollIntoView({ block:'nearest' });
+
+    progLbl.textContent = `${i+1} / ${total}`;
+    progFill.style.width = `${Math.round((i / total) * 100)}%`;
+
+    // Temporarily set S.file / S.totalPages for buildFilenameForItem
+    S.file       = item.file;
+    S.totalPages = item.pages || 0;
+
+    const filename = buildFilenameForItem(item);
+    item.jobNum    = filename.split('~')[0]; // store job num portion for display
+
+    try {
+      if (S.fsaMode) {
+        await copyToFolderBatch(item.file, folder, filename);
+      } else {
+        downloadFileBatch(item.file, filename);
+      }
+      commitLDFNum();
+      refreshHeader();
+      item.status = 'done';
+      doneN++;
+    } catch(e) {
+      item.status  = 'err';
+      item.errMsg  = e.message || 'Gagal';
+      errN++;
+      toast('err', `❌ ${item.file.name}: ${item.errMsg}`);
+    }
+
+    updateBatchItemDOM(i);
+    // small yield between files
+    await new Promise(r => setTimeout(r, 80));
+  }
+
+  progFill.style.width = '100%';
+  progLbl.textContent  = `${doneN} / ${total} selesai`;
+
+  S.batchRunning = false;
+  S.fnLocked     = false;
+  btn.disabled   = false;
+  document.getElementById('reset-btn').disabled = false;
+  refreshBar();
+
+  if (errN === 0) {
+    toast('ok', `✅ Batch selesai — ${doneN} file dicetak ke ${folder}\\`);
+  } else {
+    toast('wrn', `Batch selesai: ${doneN} OK, ${errN} gagal`);
+  }
+}
+
+async function copyToFolderBatch(file, folder, filename) {
+  let perm = await S.rootHandle.queryPermission({ mode:'readwrite' });
+  if (perm !== 'granted') {
+    perm = await S.rootHandle.requestPermission({ mode:'readwrite' });
+    if (perm !== 'granted') throw new Error('Izin folder ditolak');
+  }
+  const sub = await S.rootHandle.getDirectoryHandle(folder, { create:true });
+  const fh  = await sub.getFileHandle(filename, { create:true });
+  const wrt = await fh.createWritable();
+  await wrt.write(file);
+  await wrt.close();
+}
+
+function downloadFileBatch(file, filename) {
+  const url = URL.createObjectURL(file);
+  const a   = document.createElement('a');
+  a.href     = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function resetApp() {
+  // Reset batch state
+  S.batchMode    = false;
+  S.batchQueue   = [];
+  S.batchRunning = false;
+  document.getElementById('batch-panel').classList.remove('show');
+  document.getElementById('batch-list').innerHTML = '';
+  document.getElementById('batch-progress-wrap').classList.remove('show');
+  document.getElementById('batch-progress-fill').style.width = '0%';
+  document.getElementById('reset-btn').disabled = false;
+
+  // Reset state (preserve prefix, rootHandle, fsaMode)
   S.file       = null;
   S.totalPages = 0;
   S.mat        = null;
   S.lainText   = '';
   S.qty        = '1';
-  if (!preserveCustomer) S.customer = '';
+  S.customer   = '';
   S.isTB       = false;
   S.allPages   = false;
   S.lamit      = null;
@@ -1643,9 +2137,9 @@ function resetApp(preserveCustomer = false) {
   const lainInp = document.getElementById('lain-input');
   if (lainInp) { lainInp.classList.remove('show'); lainInp.value = ''; }
 
-  // Reset qty and customer
+  // Reset qty, customer
   document.getElementById('qty-input').value = '1';
-  if (!preserveCustomer) document.getElementById('cust-input').value = '';
+  document.getElementById('cust-input').value = '';
   document.getElementById('unit-lbl').textContent = 'Lbr';
 
   // Reset sisi toggles
@@ -1678,7 +2172,7 @@ function resetApp(preserveCustomer = false) {
   document.getElementById('dest-sub').textContent = '—';
 
   refreshBar();
-  toast('ok', 'Form direset.');
+  toast('ok', 'Form direset ke kondisi awal.');
 }
 
 function toast(type, msg) {
@@ -1702,11 +2196,27 @@ dz.addEventListener('dragleave', ()  => dz.classList.remove('over'));
 dz.addEventListener('drop', e => {
   e.preventDefault();
   dz.classList.remove('over');
-  const f = e.dataTransfer.files[0];
-  if (f) loadPDF(f);
+  const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
+  if (!files.length) { toast('err','Tidak ada file PDF yang valid.'); return; }
+  if (files.length === 1) {
+    exitBatchMode();
+    loadPDF(files[0]);
+  } else {
+    enterBatchMode(files);
+  }
 });
 dz.addEventListener('click', () => di.click());
-di.addEventListener('change', () => { if (di.files[0]) loadPDF(di.files[0]); });
+di.addEventListener('change', () => {
+  const files = Array.from(di.files).filter(f => f.type === 'application/pdf');
+  di.value = '';
+  if (!files.length) return;
+  if (files.length === 1) {
+    exitBatchMode();
+    loadPDF(files[0]);
+  } else {
+    enterBatchMode(files);
+  }
+});
 
 document.getElementById('fname-input').addEventListener('input', () => {
   S.fnLocked = true;
