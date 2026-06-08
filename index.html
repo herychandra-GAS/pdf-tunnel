@@ -159,7 +159,7 @@
 
     /* ── LEFT PANEL ──────────────────────────────────────────── */
     #left {
-      width:20%; min-width:350px;
+      width:268px; min-width:268px;
       border-right:1px solid var(--border);
       display:flex; flex-direction:column;
       overflow-y:auto; overflow-x:hidden;
@@ -691,6 +691,32 @@
     .bq-remove:hover { color:var(--danger); }
     .bq-item.done .bq-remove,
     .bq-item.active .bq-remove { opacity:.3; pointer-events:none; }
+
+    /* inline qty input in batch row */
+    .bq-qty-wrap {
+      display:flex; flex-direction:column; align-items:center;
+      gap:2px; flex-shrink:0;
+    }
+    .bq-qty-lbl {
+      font-size:9px; font-weight:600; text-transform:uppercase;
+      letter-spacing:.06em; color:var(--text-dim);
+    }
+    .bq-qty-input {
+      width:36px;
+      background:var(--surface-2);
+      border:1px solid var(--border);
+      border-radius:3px;
+      color:var(--text);
+      font-family:var(--mono); font-size:13px; font-weight:600;
+      padding:3px 4px; text-align:center;
+      transition:border-color .12s;
+    }
+    .bq-qty-input:focus { outline:none; border-color:var(--accent); }
+    .bq-qty-input::-webkit-inner-spin-button,
+    .bq-qty-input::-webkit-outer-spin-button { -webkit-appearance:none; }
+    .bq-qty-input.overridden { border-color:var(--warn); color:var(--warn); }
+    .bq-item.done .bq-qty-input,
+    .bq-item.active .bq-qty-input { opacity:.4; pointer-events:none; }
 
     /* thumbnail + page count column inside batch row */
     .bq-thumb-col {
@@ -1778,7 +1804,7 @@ document.getElementById('inp-chprefix').addEventListener('keydown', e => {
 // ── BATCH MODE ───────────────────────────────────────────────────
 function enterBatchMode(files) {
   S.batchMode  = true;
-  S.batchQueue = files.map(f => ({ file: f, pages: 0, status: 'pending', jobNum: '', errMsg: '' }));
+  S.batchQueue = files.map(f => ({ file: f, pages: 0, status: 'pending', jobNum: '', errMsg: '', qty: S.qty || '1' }));
   S.file       = files[0]; // use first file for state context (pages loaded async)
   S.totalPages = 0;
   S.fnLocked   = false;
@@ -1842,11 +1868,21 @@ function renderBatchList() {
            <div class="loader-spin" style="width:10px;height:10px;border-width:1.5px"></div>
          </div>`;
 
+    const qtyVal      = item.qty || '1';
+    const qtyOverride = item.qty !== (S.qty || '1') ? ' overridden' : '';
+
     el.innerHTML = `
       <span class="bq-num">${idx + 1}</span>
       <div class="bq-thumb-col" id="bq-thumb-col-${idx}">
         <div class="bq-thumb-wrap" id="bq-thumb-${idx}">${thumbInner}</div>
         <span class="${pagesClass}" id="bq-pages-${idx}">${pagesTxt}</span>
+      </div>
+      <div class="bq-qty-wrap">
+        <span class="bq-qty-lbl">Jml</span>
+        <input type="number" class="bq-qty-input${qtyOverride}" id="bq-qty-${idx}"
+          value="${qtyVal}" min="1"
+          onchange="setBatchItemQty(${idx}, this.value)"
+          onclick="event.stopPropagation()">
       </div>
       <div class="bq-info">
         <div class="bq-name" title="${item.file.name}">${item.file.name.length > 34 ? item.file.name.slice(0,31)+'…' : item.file.name}</div>
@@ -1857,6 +1893,20 @@ function renderBatchList() {
     `;
     list.appendChild(el);
   });
+}
+
+function setBatchItemQty(idx, val) {
+  const q = parseInt(val);
+  if (isNaN(q) || q < 1) {
+    // revert to current value
+    const inp = document.getElementById(`bq-qty-${idx}`);
+    if (inp) inp.value = S.batchQueue[idx].qty || '1';
+    return;
+  }
+  S.batchQueue[idx].qty = String(q);
+  // highlight overridden rows (different from global qty)
+  const inp = document.getElementById(`bq-qty-${idx}`);
+  if (inp) inp.classList.toggle('overridden', S.batchQueue[idx].qty !== (S.qty || '1'));
 }
 
 function removeBatchItem(idx) {
@@ -1939,7 +1989,7 @@ function buildFilenameForItem(item) {
   if (!S.mat) return '';
 
   const id   = nextLDFNum();
-  const qty  = S.qty || '1';
+  const qty  = item.qty || S.qty || '1';
   const tb2  = S.isTB ? 'TB' : '';
   const lmtS = S.lamit ? LAMIT[S.lamit].code : '';
   const cutS = S.cutting ? '+Cutting' : '';
@@ -2232,7 +2282,20 @@ document.getElementById('fname-input').addEventListener('input', () => {
 });
 
 document.getElementById('qty-input').addEventListener('input', e => {
-  S.qty = e.target.value; S.fnLocked = false; refreshBar();
+  S.qty = e.target.value;
+  S.fnLocked = false;
+  // sync all batch rows to the new global qty
+  if (S.batchMode) {
+    S.batchQueue.forEach((item, idx) => {
+      item.qty = S.qty || '1';
+      const inp = document.getElementById(`bq-qty-${idx}`);
+      if (inp) {
+        inp.value = item.qty;
+        inp.classList.remove('overridden');
+      }
+    });
+  }
+  refreshBar();
 });
 document.getElementById('cust-input').addEventListener('input', e => {
   S.customer = e.target.value; S.fnLocked = false; refreshBar();
