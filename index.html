@@ -1733,7 +1733,8 @@ async function copyToFolder(filename) {
     setTimeout(() => {
       btn.textContent = 'Print ▶';
       btn.classList.remove('done');
-    }, 2200);
+      resetAfterBatch();
+    }, 2600);
 
   } catch(e) {
     if (e.name === 'NotAllowedError') {
@@ -1762,6 +1763,7 @@ function downloadFile(filename) {
   refreshBar();
 
   toast('ok', `⬇️ Pindahkan ke C:\\#Cetak\\${folder}\\`);
+  setTimeout(() => resetAfterBatch(), 2600);
 }
 
 function showSetup() {
@@ -2121,6 +2123,7 @@ async function doBatchAction() {
 
   if (errN === 0) {
     toast('ok', `✅ Batch selesai — ${doneN} file dicetak ke ${folder}\\`);
+    setTimeout(() => resetAfterBatch(), 2600);
   } else {
     toast('wrn', `Batch selesai: ${doneN} OK, ${errN} gagal`);
   }
@@ -2146,6 +2149,14 @@ function downloadFileBatch(file, filename) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function resetAfterBatch() {
+  const savedCustomer = S.customer;
+  const savedCustVal  = document.getElementById('cust-input').value;
+  resetApp();
+  S.customer = savedCustomer;
+  document.getElementById('cust-input').value = savedCustVal;
 }
 
 function resetApp() {
