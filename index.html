@@ -672,19 +672,7 @@
       font-size:12px; color:var(--text);
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
     }
-    .bq-meta { font-size:11px; color:var(--text-dim); font-family:var(--mono); margin-top:2px; display:flex; align-items:center; gap:5px; }
-    .bq-pages-pill {
-      display:inline-flex; align-items:center; gap:3px;
-      background:var(--surface-3);
-      border:1px solid var(--border-hi);
-      border-radius:3px;
-      padding:1px 5px;
-      font-family:var(--mono); font-size:11px; font-weight:600;
-      color:var(--text-muted);
-      flex-shrink:0;
-    }
-    .bq-pages-pill.loaded { color:var(--text); border-color:var(--accent); background:var(--accent-dim); }
-    .bq-fsize { color:var(--text-dim); font-size:11px; font-family:var(--mono); }
+    .bq-meta { font-size:11px; color:var(--text-dim); font-family:var(--mono); margin-top:2px; }
     .bq-status {
       font-size:10px; font-weight:600; letter-spacing:.04em;
       padding:2px 6px; border-radius:3px;
@@ -704,7 +692,11 @@
     .bq-item.done .bq-remove,
     .bq-item.active .bq-remove { opacity:.3; pointer-events:none; }
 
-    /* thumbnail inside batch row */
+    /* thumbnail + page count column inside batch row */
+    .bq-thumb-col {
+      display:flex; flex-direction:column; align-items:center;
+      gap:3px; flex-shrink:0; width:36px;
+    }
     .bq-thumb-wrap {
       width:36px; height:46px; flex-shrink:0;
       background:var(--surface-3);
@@ -719,14 +711,12 @@
       width:100%; height:100%;
       display:flex; align-items:center; justify-content:center;
     }
-    .bq-thumb-pgbadge {
-      position:absolute; bottom:0; right:0;
-      background:rgba(0,0,0,.72);
-      color:#fff; font-size:9px;
-      font-family:var(--mono); font-weight:700;
-      padding:2px 4px; border-radius:2px 0 0 0;
-      line-height:1.3;
+    .bq-thumb-pages {
+      font-family:var(--mono); font-size:10px; font-weight:600;
+      color:var(--text-dim); text-align:center; line-height:1;
+      white-space:nowrap;
     }
+    .bq-thumb-pages.loaded { color:var(--accent); }
 
     #batch-progress-wrap {
       display:none; align-items:center; gap:8px;
@@ -1837,11 +1827,8 @@ function renderBatchList() {
                 : item.status === 'active' ? '⏳'
                 : '📄';
 
-    const pagesPill = item.pages
-      ? `<span class="bq-pages-pill loaded" id="bq-pill-${idx}">${item.pages} hal</span>`
-      : `<span class="bq-pages-pill" id="bq-pill-${idx}">…</span>`;
-    const fsizeTxt = `<span class="bq-fsize">${fmtBytes(item.file.size)}</span>`;
-    const errTxt   = item.errMsg ? `<span style="color:var(--danger)">${item.errMsg}</span>` : '';
+    const pagesTxt  = item.pages ? `${item.pages} hal` : '…';
+    const pagesClass = item.pages ? 'bq-thumb-pages loaded' : 'bq-thumb-pages';
 
     const statusLbl = item.status === 'done'    ? `✓ ${item.jobNum}`
                     : item.status === 'err'      ? 'Error'
@@ -1850,18 +1837,20 @@ function renderBatchList() {
 
     // thumbnail slot — canvas will be injected by loadBatchPageCounts
     const thumbInner = item.thumbDataUrl
-      ? `<img class="bq-thumb-canvas" src="${item.thumbDataUrl}" alt="">
-         <span class="bq-thumb-pgbadge">${item.pages}p</span>`
+      ? `<img class="bq-thumb-canvas" src="${item.thumbDataUrl}" alt="">`
       : `<div class="bq-thumb-loading">
            <div class="loader-spin" style="width:10px;height:10px;border-width:1.5px"></div>
          </div>`;
 
     el.innerHTML = `
       <span class="bq-num">${idx + 1}</span>
-      <div class="bq-thumb-wrap" id="bq-thumb-${idx}">${thumbInner}</div>
+      <div class="bq-thumb-col" id="bq-thumb-col-${idx}">
+        <div class="bq-thumb-wrap" id="bq-thumb-${idx}">${thumbInner}</div>
+        <span class="${pagesClass}" id="bq-pages-${idx}">${pagesTxt}</span>
+      </div>
       <div class="bq-info">
         <div class="bq-name" title="${item.file.name}">${item.file.name.length > 34 ? item.file.name.slice(0,31)+'…' : item.file.name}</div>
-        <div class="bq-meta" id="bq-meta-${idx}">${pagesPill}${fsizeTxt}${errTxt}</div>
+        <div class="bq-meta" id="bq-meta-${idx}">${fmtBytes(item.file.size)}${item.errMsg ? ' · ' + item.errMsg : ''}</div>
       </div>
       <span class="bq-status ${item.status}" id="bq-st-${idx}">${statusLbl}</span>
       <button class="bq-remove" title="Hapus dari antrian" onclick="removeBatchItem(${idx})">×</button>
@@ -1923,13 +1912,12 @@ async function loadBatchPageCounts() {
       const thumbWrap = document.getElementById(`bq-thumb-${i}`);
       if (thumbWrap) {
         thumbWrap.innerHTML =
-          `<img class="bq-thumb-canvas" src="${item.thumbDataUrl}" alt="">
-           <span class="bq-thumb-pgbadge">${item.pages}p</span>`;
+          `<img class="bq-thumb-canvas" src="${item.thumbDataUrl}" alt="">`;
       }
-      const pillEl = document.getElementById(`bq-pill-${i}`);
-      if (pillEl) {
-        pillEl.textContent = `${item.pages} hal`;
-        pillEl.classList.add('loaded');
+      const pagesEl = document.getElementById(`bq-pages-${i}`);
+      if (pagesEl) {
+        pagesEl.textContent = `${item.pages} hal`;
+        pagesEl.className = 'bq-thumb-pages loaded';
       }
 
       // Refresh bar once all done (for the loading guard)
@@ -1939,8 +1927,8 @@ async function loadBatchPageCounts() {
       item.errMsg = 'Gagal baca PDF';
       const thumbWrap = document.getElementById(`bq-thumb-${i}`);
       if (thumbWrap) thumbWrap.innerHTML = `<div class="bq-thumb-loading">❌</div>`;
-      const pillEl = document.getElementById(`bq-pill-${i}`);
-      if (pillEl) { pillEl.textContent = '?'; pillEl.style.borderColor = 'var(--danger)'; pillEl.style.color = 'var(--danger)'; }
+      const pagesEl = document.getElementById(`bq-pages-${i}`);
+      if (pagesEl) { pagesEl.textContent = '!'; pagesEl.style.color = 'var(--danger)'; }
       refreshBar();
     }
   }
@@ -2003,17 +1991,7 @@ function updateBatchItemDOM(idx) {
 
   const metaEl = document.getElementById('bq-meta-' + idx);
   if (metaEl && item.errMsg && item.status === 'err') {
-    const pillEl = document.getElementById('bq-pill-' + idx);
-    if (pillEl) { pillEl.style.borderColor = 'var(--danger)'; pillEl.style.color = 'var(--danger)'; }
-    // append error text after existing pill/fsize spans
-    const existing = metaEl.querySelector('.bq-fsize');
-    if (existing && !metaEl.querySelector('.bq-err-txt')) {
-      const errSpan = document.createElement('span');
-      errSpan.className = 'bq-err-txt';
-      errSpan.style.color = 'var(--danger)';
-      errSpan.textContent = item.errMsg;
-      metaEl.appendChild(errSpan);
-    }
+    metaEl.textContent = `${fmtBytes(item.file.size)} · ${item.errMsg}`;
   }
 }
 
