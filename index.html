@@ -672,7 +672,19 @@
       font-size:12px; color:var(--text);
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
     }
-    .bq-meta { font-size:11px; color:var(--text-dim); font-family:var(--mono); margin-top:1px; }
+    .bq-meta { font-size:11px; color:var(--text-dim); font-family:var(--mono); margin-top:2px; display:flex; align-items:center; gap:5px; }
+    .bq-pages-pill {
+      display:inline-flex; align-items:center; gap:3px;
+      background:var(--surface-3);
+      border:1px solid var(--border-hi);
+      border-radius:3px;
+      padding:1px 5px;
+      font-family:var(--mono); font-size:11px; font-weight:600;
+      color:var(--text-muted);
+      flex-shrink:0;
+    }
+    .bq-pages-pill.loaded { color:var(--text); border-color:var(--accent); background:var(--accent-dim); }
+    .bq-fsize { color:var(--text-dim); font-size:11px; font-family:var(--mono); }
     .bq-status {
       font-size:10px; font-weight:600; letter-spacing:.04em;
       padding:2px 6px; border-radius:3px;
@@ -709,11 +721,11 @@
     }
     .bq-thumb-pgbadge {
       position:absolute; bottom:0; right:0;
-      background:rgba(0,0,0,.65);
-      color:#fff; font-size:8px;
-      font-family:var(--mono); font-weight:600;
-      padding:1px 3px; border-radius:2px 0 0 0;
-      line-height:1.4;
+      background:rgba(0,0,0,.72);
+      color:#fff; font-size:9px;
+      font-family:var(--mono); font-weight:700;
+      padding:2px 4px; border-radius:2px 0 0 0;
+      line-height:1.3;
     }
 
     #batch-progress-wrap {
@@ -1825,9 +1837,11 @@ function renderBatchList() {
                 : item.status === 'active' ? '⏳'
                 : '📄';
 
-    const metaTxt = item.pages
-      ? `${item.pages} hal · ${fmtBytes(item.file.size)}`
-      : fmtBytes(item.file.size);
+    const pagesPill = item.pages
+      ? `<span class="bq-pages-pill loaded" id="bq-pill-${idx}">${item.pages} hal</span>`
+      : `<span class="bq-pages-pill" id="bq-pill-${idx}">…</span>`;
+    const fsizeTxt = `<span class="bq-fsize">${fmtBytes(item.file.size)}</span>`;
+    const errTxt   = item.errMsg ? `<span style="color:var(--danger)">${item.errMsg}</span>` : '';
 
     const statusLbl = item.status === 'done'    ? `✓ ${item.jobNum}`
                     : item.status === 'err'      ? 'Error'
@@ -1847,7 +1861,7 @@ function renderBatchList() {
       <div class="bq-thumb-wrap" id="bq-thumb-${idx}">${thumbInner}</div>
       <div class="bq-info">
         <div class="bq-name" title="${item.file.name}">${item.file.name.length > 34 ? item.file.name.slice(0,31)+'…' : item.file.name}</div>
-        <div class="bq-meta" id="bq-meta-${idx}">${metaTxt}${item.errMsg ? ' · ' + item.errMsg : ''}</div>
+        <div class="bq-meta" id="bq-meta-${idx}">${pagesPill}${fsizeTxt}${errTxt}</div>
       </div>
       <span class="bq-status ${item.status}" id="bq-st-${idx}">${statusLbl}</span>
       <button class="bq-remove" title="Hapus dari antrian" onclick="removeBatchItem(${idx})">×</button>
@@ -1912,8 +1926,11 @@ async function loadBatchPageCounts() {
           `<img class="bq-thumb-canvas" src="${item.thumbDataUrl}" alt="">
            <span class="bq-thumb-pgbadge">${item.pages}p</span>`;
       }
-      const metaEl = document.getElementById(`bq-meta-${i}`);
-      if (metaEl) metaEl.textContent = `${item.pages} hal · ${fmtBytes(item.file.size)}`;
+      const pillEl = document.getElementById(`bq-pill-${i}`);
+      if (pillEl) {
+        pillEl.textContent = `${item.pages} hal`;
+        pillEl.classList.add('loaded');
+      }
 
       // Refresh bar once all done (for the loading guard)
       refreshBar();
@@ -1922,8 +1939,8 @@ async function loadBatchPageCounts() {
       item.errMsg = 'Gagal baca PDF';
       const thumbWrap = document.getElementById(`bq-thumb-${i}`);
       if (thumbWrap) thumbWrap.innerHTML = `<div class="bq-thumb-loading">❌</div>`;
-      const metaEl = document.getElementById(`bq-meta-${i}`);
-      if (metaEl) metaEl.textContent = `${fmtBytes(item.file.size)} · Gagal baca`;
+      const pillEl = document.getElementById(`bq-pill-${i}`);
+      if (pillEl) { pillEl.textContent = '?'; pillEl.style.borderColor = 'var(--danger)'; pillEl.style.color = 'var(--danger)'; }
       refreshBar();
     }
   }
@@ -1986,7 +2003,17 @@ function updateBatchItemDOM(idx) {
 
   const metaEl = document.getElementById('bq-meta-' + idx);
   if (metaEl && item.errMsg && item.status === 'err') {
-    metaEl.textContent = `${item.pages ? item.pages + ' hal · ' : ''}${fmtBytes(item.file.size)} · ${item.errMsg}`;
+    const pillEl = document.getElementById('bq-pill-' + idx);
+    if (pillEl) { pillEl.style.borderColor = 'var(--danger)'; pillEl.style.color = 'var(--danger)'; }
+    // append error text after existing pill/fsize spans
+    const existing = metaEl.querySelector('.bq-fsize');
+    if (existing && !metaEl.querySelector('.bq-err-txt')) {
+      const errSpan = document.createElement('span');
+      errSpan.className = 'bq-err-txt';
+      errSpan.style.color = 'var(--danger)';
+      errSpan.textContent = item.errMsg;
+      metaEl.appendChild(errSpan);
+    }
   }
 }
 
