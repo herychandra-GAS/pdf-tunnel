@@ -1482,6 +1482,45 @@ function applyButtonStates() {
   }
 }
 
+function applyBatchButtonStates() {
+  if (!S.batchMode) return;
+  const btn2sisi  = document.getElementById('tb-2sisi');
+  const btn1hal   = document.getElementById('tb-1hal');
+  const btnAllHal = document.getElementById('tb-allhal');
+
+  // Only consider items whose page count is known (loaded successfully)
+  const loadedItems = S.batchQueue.filter(x => x.pages > 0);
+  if (!loadedItems.length) return;
+
+  const allEven = loadedItems.every(x => x.pages % 2 === 0);
+  const matNo2s = S.mat && !S.mat.tb;
+
+  // "All" — always enabled & auto-activated in batch mode
+  btnAllHal.disabled = false;
+  btn1hal.disabled   = false;
+  if (!S.allPages && !S.isTB) {
+    S.allPages = true;
+    S.fnLocked = false;
+    btn1hal.classList.remove('active');
+    btnAllHal.classList.add('active');
+  }
+
+  // "TB" — only enabled if all loaded files have even pages AND material supports it
+  btn2sisi.disabled = !allEven || !!matNo2s;
+  if (!allEven && S.isTB) {
+    // odd file found — force back to 1 Sisi
+    S.isTB = false;
+    S.fnLocked = false;
+    document.getElementById('tb-1sisi').classList.add('active');
+    btn2sisi.classList.remove('active');
+    // restore hal toggles
+    btn1hal.disabled   = false;
+    btnAllHal.disabled = false;
+  }
+
+  refreshBar();
+}
+
 function setSisi(isTB) {
   S.isTB     = isTB;
   S.fnLocked = false;
@@ -1928,6 +1967,7 @@ function removeBatchItem(idx) {
   S.file = S.batchQueue[0].file;
   S.totalPages = S.batchQueue[0].pages || 0;
   renderBatchList();
+  applyBatchButtonStates();
   refreshBar();
 }
 
@@ -1953,13 +1993,6 @@ async function loadBatchPageCounts() {
       await pg.render({ canvasContext: cv.getContext('2d'), viewport: svp }).promise;
       item.thumbDataUrl = cv.toDataURL('image/jpeg', 0.82);
 
-      // Update first file's totalPages for form state
-      if (i === 0) {
-        S.totalPages = pdf.numPages;
-        applyButtonStates();
-        refreshBar();
-      }
-
       // Patch DOM in-place — no full re-render
       const thumbWrap = document.getElementById(`bq-thumb-${i}`);
       if (thumbWrap) {
@@ -1972,7 +2005,7 @@ async function loadBatchPageCounts() {
         pagesEl.className = 'bq-thumb-pages loaded';
       }
 
-      // Refresh bar once all done (for the loading guard)
+      // Refresh bar mid-load (for the loading guard)
       refreshBar();
 
     } catch(e) {
@@ -1984,6 +2017,8 @@ async function loadBatchPageCounts() {
       refreshBar();
     }
   }
+  // All page counts loaded — now evaluate batch button states once
+  if (S.batchMode) applyBatchButtonStates();
 }
 
 // Build filename for a specific batch item (uses its own page count)
