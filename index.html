@@ -1457,9 +1457,10 @@ function applyButtonStates() {
   const btn1hal   = document.getElementById('tb-1hal');
   const btnAllHal = document.getElementById('tb-allhal');
 
-  const is1page = S.totalPages === 1;
-  const matNo2s = S.mat && !S.mat.tb;
-  const no2sisi = is1page || matNo2s;
+  const is1page  = S.totalPages === 1;
+  const isOdd    = S.totalPages > 1 && S.totalPages % 2 !== 0;
+  const matNo2s  = S.mat && !S.mat.tb;
+  const no2sisi  = is1page || isOdd || matNo2s;
 
   btn2sisi.disabled = no2sisi;
   if (no2sisi && S.isTB) {
