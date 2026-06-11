@@ -859,6 +859,40 @@
       gap:8px; padding:14px;
       font-size:12px; color:var(--text-muted);
     }
+    .exp-item.exp-selected {
+      background:rgba(41,217,163,.09);
+      border-left:2px solid var(--accent);
+    }
+    .exp-item.exp-selected .exp-name  { color:var(--accent); font-weight:500; }
+    .exp-item.exp-loaded   .exp-name  { color:var(--accent); font-weight:500; }
+
+    #exp-sel-bar {
+      display:none; align-items:center; gap:7px;
+      padding:5px 8px;
+      background:var(--accent-dim);
+      border-top:1px solid rgba(41,217,163,.22);
+    }
+    #exp-sel-bar.show { display:flex; }
+    #exp-sel-count {
+      flex:1; font-size:11px; font-weight:600;
+      color:var(--accent); font-family:var(--mono);
+    }
+    .exp-sel-btn {
+      background:none; border:1px solid rgba(41,217,163,.45);
+      color:var(--accent); border-radius:3px;
+      font-size:11px; padding:2px 9px;
+      cursor:pointer; font-family:var(--font);
+      transition:background .12s, color .12s;
+      white-space:nowrap;
+    }
+    .exp-sel-btn:hover { background:var(--accent); color:#0d0f14; }
+    .exp-sel-clear {
+      background:none; border:none;
+      color:var(--text-dim); font-size:13px; line-height:1;
+      cursor:pointer; padding:2px 3px;
+      transition:color .12s;
+    }
+    .exp-sel-clear:hover { color:var(--danger); }
     /* drag-over highlight on dropzone when coming from explorer */
     #dropzone.exp-over {
       border-color:var(--accent);
@@ -1095,7 +1129,12 @@
           <span class="exp-crumb exp-crumb-cur">—</span>
         </div>
         <div id="exp-list">
-          <div class="exp-empty-msg">Pilih folder untuk mulai browse.<br><span style="color:var(--text-dim);font-size:11px">Klik PDF untuk load · Drag ke drop zone</span></div>
+          <div class="exp-empty-msg">Pilih folder untuk mulai browse.<br><span style="color:var(--text-dim);font-size:11px">Klik PDF untuk pilih · Double-click untuk load langsung</span></div>
+        </div>
+        <div id="exp-sel-bar">
+          <span id="exp-sel-count">0 file dipilih</span>
+          <button class="exp-sel-btn" onclick="expLoadSelected()">Load ▶</button>
+          <button class="exp-sel-clear" onclick="expClearSelection()" title="Hapus pilihan">✕</button>
         </div>
       </div>
     </div>
@@ -2418,10 +2457,10 @@ const di = document.getElementById('drop-input');
 // ── FILE EXPLORER ──────────────────────────────────────────────
 const EXP = {
   currentHandle: null,
-  breadcrumbs: [],      // [{name, handle}]
-  loadedName:  null,    // last loaded PDF filename
+  breadcrumbs:   [],          // [{name, handle}]
+  selected:      new Map(),   // name → handle  (persists within folder)
 };
-let _expDragHandle = null;  // active drag from explorer
+let _expDragHandles = [];     // handles being dragged from explorer
 
 function toggleExplorer() {
   const body = document.getElementById('exp-body');
@@ -2439,7 +2478,8 @@ async function pickExplorerFolder() {
     const handle = await window.showDirectoryPicker({ mode: 'read' });
     EXP.currentHandle = handle;
     EXP.breadcrumbs   = [{ name: handle.name, handle }];
-    EXP.loadedName    = null;
+    EXP.selected.clear();
+    refreshExpSelBar();
     await renderExplorer();
   } catch(e) {
     if (e.name !== 'AbortError') toast('err', 'Gagal membuka folder');
@@ -2513,34 +2553,59 @@ async function renderExplorer() {
   // ── PDF files ─────────────────────────────────────────────
   pdfs.forEach(({ name, handle }) => {
     const item = document.createElement('div');
-    item.className   = 'exp-item is-pdf';
-    item.draggable   = true;
-    if (name === EXP.loadedName) item.classList.add('exp-loaded');
-    item.innerHTML   = `<span class="exp-icon">📄</span><span class="exp-name">${escHtml(name)}</span>`;
+    item.className = 'exp-item is-pdf';
+    item.draggable = true;
+    if (EXP.selected.has(name)) item.classList.add('exp-selected');
 
-    // Click → load PDF
-    item.addEventListener('click', async () => {
+    item.innerHTML = `<span class="exp-icon">📄</span><span class="exp-name">${escHtml(name)}</span>`;
+
+    // ── Single click → toggle selection ──────────────────
+    item.addEventListener('click', e => {
+      if (EXP.selected.has(name)) {
+        EXP.selected.delete(name);
+        item.classList.remove('exp-selected');
+      } else {
+        EXP.selected.set(name, handle);
+        item.classList.add('exp-selected');
+      }
+      refreshExpSelBar();
+    });
+
+    // ── Double-click → load immediately (single) ─────────
+    item.addEventListener('dblclick', async e => {
+      e.stopPropagation();
       try {
         const file = await handle.getFile();
-        EXP.loadedName = name;
         exitBatchMode();
         loadPDF(file);
-        // Highlight active
-        list.querySelectorAll('.exp-item.is-pdf').forEach(el => el.classList.remove('exp-loaded'));
-        item.classList.add('exp-loaded');
+        EXP.selected.clear();
+        refreshExpSelBar();
+        list.querySelectorAll('.exp-item.is-pdf').forEach(el => el.classList.remove('exp-selected'));
       } catch(err) { toast('err', 'Gagal membaca file'); }
     });
 
-    // Drag → drop zone
+    // ── Drag start ────────────────────────────────────────
+    // If this item is selected, drag the whole selection.
+    // If it's NOT selected, drag just this item without disturbing selection.
     item.addEventListener('dragstart', e => {
-      _expDragHandle = handle;
-      item.classList.add('exp-dragging');
+      if (EXP.selected.size > 0 && EXP.selected.has(name)) {
+        _expDragHandles = [...EXP.selected.values()];
+      } else {
+        _expDragHandles = [handle];
+      }
+      // Visual: dim all items being dragged
+      list.querySelectorAll('.exp-item.is-pdf').forEach(el => {
+        const n = el.querySelector('.exp-name')?.textContent;
+        if (_expDragHandles.length > 1 ? EXP.selected.has(n) : n === name) {
+          el.classList.add('exp-dragging');
+        }
+      });
       e.dataTransfer.effectAllowed = 'copy';
-      e.dataTransfer.setData('text/plain', name); // required for Firefox
+      e.dataTransfer.setData('text/plain', name);
     });
     item.addEventListener('dragend', () => {
-      _expDragHandle = null;
-      item.classList.remove('exp-dragging');
+      _expDragHandles = [];
+      list.querySelectorAll('.exp-item').forEach(el => el.classList.remove('exp-dragging'));
       dz.classList.remove('exp-over');
     });
 
@@ -2548,13 +2613,57 @@ async function renderExplorer() {
   });
 }
 
+function refreshExpSelBar() {
+  const bar   = document.getElementById('exp-sel-bar');
+  const count = document.getElementById('exp-sel-count');
+  const n     = EXP.selected.size;
+  if (n > 0) {
+    bar.classList.add('show');
+    count.textContent = `${n} file dipilih`;
+  } else {
+    bar.classList.remove('show');
+  }
+}
+
+async function expLoadSelected() {
+  if (EXP.selected.size === 0) return;
+  try {
+    const files = await Promise.all(
+      [...EXP.selected.values()].map(h => h.getFile())
+    );
+    if (files.length === 1) {
+      exitBatchMode();
+      loadPDF(files[0]);
+    } else {
+      enterBatchMode(files);
+    }
+    EXP.selected.clear();
+    refreshExpSelBar();
+    document.getElementById('exp-list')
+      ?.querySelectorAll('.exp-item.is-pdf')
+      .forEach(el => el.classList.remove('exp-selected'));
+  } catch(err) { toast('err', 'Gagal membaca file yang dipilih'); }
+}
+
+function expClearSelection() {
+  EXP.selected.clear();
+  refreshExpSelBar();
+  document.getElementById('exp-list')
+    ?.querySelectorAll('.exp-item.exp-selected')
+    .forEach(el => el.classList.remove('exp-selected'));
+}
+
 async function expNavInto(name, handle) {
+  EXP.selected.clear();
+  refreshExpSelBar();
   EXP.currentHandle = handle;
   EXP.breadcrumbs.push({ name, handle });
   await renderExplorer();
 }
 
 async function expNavTo(idx) {
+  EXP.selected.clear();
+  refreshExpSelBar();
   EXP.breadcrumbs   = EXP.breadcrumbs.slice(0, idx + 1);
   EXP.currentHandle = EXP.breadcrumbs[idx].handle;
   await renderExplorer();
@@ -2566,7 +2675,7 @@ function escHtml(s) {
 
 // Extra dragover on dropzone: show highlight when dragging from explorer
 dz.addEventListener('dragover', e => {
-  if (_expDragHandle) dz.classList.add('exp-over');
+  if (_expDragHandles.length) dz.classList.add('exp-over');
 });
 dz.addEventListener('dragleave', () => dz.classList.remove('exp-over'));
 
@@ -2580,22 +2689,22 @@ dz.addEventListener('drop', async e => {
   dz.classList.remove('exp-over');
 
   // ── Drag from File Explorer ───────────────────────────────
-  if (_expDragHandle) {
-    const h = _expDragHandle;
-    _expDragHandle = null;
+  if (_expDragHandles.length) {
+    const handles = _expDragHandles.splice(0);   // take + clear atomically
     try {
-      const file = await h.getFile();
-      EXP.loadedName = file.name;
-      // Refresh explorer highlight
-      const expList = document.getElementById('exp-list');
-      if (expList) {
-        expList.querySelectorAll('.exp-item.is-pdf').forEach(el => {
-          el.classList.toggle('exp-loaded',
-            el.querySelector('.exp-name')?.textContent === file.name);
-        });
+      const files = await Promise.all(handles.map(h => h.getFile()));
+      if (files.length === 1) {
+        exitBatchMode();
+        loadPDF(files[0]);
+      } else {
+        enterBatchMode(files);
       }
-      exitBatchMode();
-      loadPDF(file);
+      // Clear visual selection after drag-load
+      EXP.selected.clear();
+      refreshExpSelBar();
+      document.getElementById('exp-list')
+        ?.querySelectorAll('.exp-item.exp-selected')
+        .forEach(el => el.classList.remove('exp-selected'));
     } catch(err) { toast('err', 'Gagal membaca file dari explorer'); }
     return;
   }
